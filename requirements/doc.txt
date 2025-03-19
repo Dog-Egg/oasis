@@ -1,0 +1,5 @@
+-r ./_common.txt
+
+jsonschema
+sphinx
+furo

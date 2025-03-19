@@ -1,0 +1,18 @@
+[project]
+name = "django-oasis"
+version = "0.1dev1"
+dependencies = ['Zangar @ git+https://github.com/Dog-Egg/Zangar']
+
+[tool.coverage.report]
+exclude_also = ["raise NotImplementedError"]
+
+[tool.coverage.run]
+omit = ["docs/*"]
+
+[tool.pytest.ini_options]
+addopts = ["--doctest-modules"]
+python_files = ["test_*.py", "tests.py"]
+norecursedirs = ["docs/_ext"]
+
+[tool.isort]
+profile = "black"
