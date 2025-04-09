@@ -1,5 +1,0 @@
--r ./_common.txt
-
-pytest
-PyYAML
-beautifulsoup4

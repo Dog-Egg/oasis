@@ -9,10 +9,9 @@ from urllib.parse import quote
 import docutils
 import docutils.nodes
 from docutils.parsers.rst import directives
+from oasis_shared import RouterBase as Router
 from sphinx.application import Sphinx
 from sphinx.util.docutils import SphinxDirective
-
-from django_oasis.core import Router
 
 from .validate_oas import validate_openapi30
 

@@ -1,15 +1,17 @@
-django-oasis
-============
+Oasis
+=====
 
 .. toctree::
-    
-    input/index
-    output/index
-    customize_processors
-    settings
+    :caption: Used in Django
+
+    django/input/index
+    django/output/index
+    django/customize_processors
+    django/settings
+    django/examples/index
 
 .. toctree::
-    :caption: Examples
-    :glob:
+    :caption: Used in Flask
 
-    examples/*
+    flask/input/index
+    flask/examples/index

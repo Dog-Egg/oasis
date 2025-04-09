@@ -1,0 +1,11 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "django-oasis"
+version = "0.1.dev0"
+dependencies = ["Zangar @ git+https://github.com/Dog-Egg/Zangar"]
+
+[tool.setuptools.package-data]
+django_oasis = ["templates/**/*"]

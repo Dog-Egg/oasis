@@ -1,12 +1,11 @@
 import pprint
 
+from django_oasis.settings import DEFAULTS
 from docutils import nodes
 from sphinx import addnodes
 from sphinx.addnodes import desc_signature
 from sphinx.application import Sphinx
 from sphinx.directives import ObjectDescription
-
-from django_oasis.settings import DEFAULTS
 
 
 class Setting(ObjectDescription):
