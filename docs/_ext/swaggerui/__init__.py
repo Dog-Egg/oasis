@@ -61,9 +61,10 @@ def _openapi_template(router: Router):
 def setup(app: Sphinx):
     app.add_directive("swaggerui", SwaggerUI)
 
+    os.makedirs(app.outdir, exist_ok=True)
     shutil.copy(
         os.path.join(os.path.dirname(__file__), "swagger-ui.html"),
-        app.outdir,
+        os.path.join(app.outdir, "swagger-ui.html"),
     )
 
     return {}

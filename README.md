@@ -12,7 +12,11 @@ pip install git+https://github.com/Dog-Egg/oasis.git#subdirectory=packages/flask
 pip install git+https://github.com/Dog-Egg/oasis.git#subdirectory=packages/django-oasis
 ```
 
-## Testing
+## Development
+
+python >= 3.9
+
+### Testing
 
 ```sh
 tox
