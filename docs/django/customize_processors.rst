@@ -1,16 +1,8 @@
 Customize Content Processors
 ============================
 
-.. code-block::
+.. literalinclude:: /_samples/django/customize_processors/settings.py
     :caption: settings.py
-
-    OASIS_REQUEST_CONTENT_PROCESSORS = {
-        "application/yaml": "<your-project>.processors.yaml_request_processor"
-    }
-
-    OASIS_RESPONSE_CONTENT_PROCESSORS = {
-        "application/yaml": "<your-project>.processors.yaml_response_processor"
-    }
 
 .. literalinclude:: /_samples/django/customize_processors/processors.py
     :caption: processors.py

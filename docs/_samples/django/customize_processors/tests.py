@@ -1,22 +1,21 @@
+import os
+import types
+
 import yaml
 from django.test import RequestFactory, override_settings
 
-from .processors import yaml_request_processor, yaml_response_processor
 from .views import MyAPI
 
+settings_module = types.ModuleType("settings")
+with open(os.path.join(os.path.dirname(__file__), "settings.py")) as f:
+    code = f.read()
+    code = code.replace(
+        "<your-processors-module>", "_samples.django.customize_processors.processors"
+    )
+exec(code, settings_module.__dict__)
 
-@override_settings(
-    OASIS_REQUEST_CONTENT_PROCESSORS={
-        "application/yaml": yaml_request_processor.__module__
-        + "."
-        + yaml_request_processor.__name__,
-    },
-    OASIS_RESPONSE_CONTENT_PROCESSORS={
-        "application/yaml": yaml_response_processor.__module__
-        + "."
-        + yaml_response_processor.__name__,
-    },
-)
+
+@override_settings(**{k: v for k, v in vars(settings_module).items() if k.isupper()})
 def test_request():
     rf = RequestFactory()
     request = rf.generic(
