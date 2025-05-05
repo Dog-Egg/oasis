@@ -1,14 +1,11 @@
 import pytest
-from flask import Flask
 from flask.testing import FlaskClient
 
-from .urls import router
+from .app import app
 
 
 @pytest.fixture
 def client():
-    app = Flask(__name__)
-    router.register_with(app)
     yield app.test_client()
 
 

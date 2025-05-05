@@ -4,7 +4,14 @@ import pytest
 import zangar as z
 from bs4 import BeautifulSoup
 from django.test import RequestFactory
-from django_oasis import MediaType, Resource, Router, input, output, responseify
+from django_oasis import (
+    MediaType,
+    PathTemplate,
+    Resource,
+    input,
+    output,
+    responseify,
+)
 from django_oasis.settings import user_settings
 
 
@@ -77,9 +84,8 @@ def test_http_415():
 
 
 def test_router_add_url():
-    router = Router()
     with pytest.raises(ValueError) as e:
-        router.add_url("api", Resource)
+        PathTemplate("path")
     assert e.value.args == ("path must start with '/'",)
 
 

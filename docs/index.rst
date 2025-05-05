@@ -15,3 +15,8 @@ Oasis
 
     flask/input/index
     flask/examples/index
+
+.. toctree::
+    :caption: Used in Starlette
+
+    starlette/examples/index

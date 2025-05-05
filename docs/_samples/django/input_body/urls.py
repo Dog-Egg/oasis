@@ -1,6 +1,7 @@
-from django_oasis import Router
+from django_oasis import PathTemplate
 
 from .views import Login
 
-router = Router()
-router.add_url("/login", Login)
+paths = {
+    PathTemplate("/login"): Login,
+}

@@ -1,7 +1,7 @@
 From Cookie
 ===========
 
-.. literalinclude:: /_samples/flask/input_cookie/views.py
+.. literalinclude:: /_samples/flask/input_cookie/app.py
 
-.. swaggerui:: _samples.flask.input_cookie.urls.router
+.. swaggerui:: _samples.flask.input_cookie.app.paths
     :config: {"docExpansion": "full"}

@@ -1,6 +1,6 @@
 RESTfull
 ========
 
-.. literalinclude:: /_samples/flask/restful/views.py
+.. literalinclude:: /_samples/flask/restful/app.py
 
-.. swaggerui:: _samples.flask.restful.urls.router
+.. swaggerui:: _samples.flask.restful.app.paths

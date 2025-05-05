@@ -1,16 +1,13 @@
 import pytest
 import zangar as z
 from flask import Flask
-from flask_oasis import MediaType, Resource, Router, input
-
-router = Router()
-router.add_url("/", Resource)
+from flask_oasis import MediaType, Resource, input
 
 
 @pytest.fixture
 def app():
     app = Flask(__name__)
-    router.register_with(app)
+    app.add_url_rule("/", view_func=Resource.as_view())
     yield app
 
 

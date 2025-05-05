@@ -12,10 +12,11 @@ from oasis_shared import (
     HeaderBase,
     ParameterDecoratorBase,
     PathBase,
+    PathTemplateBase,
     QueryBase,
     RequestBodyDecoratorBase,
     ResourceBase,
-    RouterBase,
+    catch_throw,
     responseify_base,
 )
 
@@ -44,6 +45,7 @@ class Resource(ResourceBase):
 
     @classmethod
     def as_view(cls):
+        @catch_throw
         def view(*args, **kwargs):
             # 每个请求都会创建一个新的 Resoruce 实例，这意味即使将数据写入 self 也是安全的。
             return cls().dispatch(*args, **kwargs)
@@ -120,27 +122,6 @@ def body(*args, **kwargs):
     return RequestBodyDecorator(*args, **kwargs)
 
 
-class Router(RouterBase):
-    @property
-    def urls(self):
-        from django.urls import path
-
-        rv = []
-        for item in self._items:
-            routes: list[str] = []
-            for part in item.split_path:
-                if isinstance(part, str):
-                    routes.append(part)
-                else:
-                    routes.append(
-                        f"<{part.variable}>"
-                        if part.converter is None
-                        else f"<{part.converter}:{part.variable}>"
-                    )
-            rv.append(path("/".join(routes), item.resource.as_view()))
-        return rv
-
-
 def responseify(*args, **kwargs):
     return responseify_base(
         *args,
@@ -152,3 +133,19 @@ def responseify(*args, **kwargs):
             )[content_type]
         ),
     )
+
+
+class PathTemplate(PathTemplateBase):
+    @property
+    def django_path(self):
+        parts = []
+        for part in self._parts:
+            if isinstance(part, str):
+                parts.append(part)
+            else:
+                parts.append(
+                    f"<{part.variable}>"
+                    if part.converter is None
+                    else f"<{part.converter}:{part.variable}>"
+                )
+        return "/".join(parts)

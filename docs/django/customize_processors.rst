@@ -9,4 +9,4 @@ Customize Content Processors
 
 .. literalinclude:: /_samples/django/customize_processors/views.py
 
-.. swaggerui:: _samples.django.customize_processors.urls.router
+.. swaggerui:: _samples.django.customize_processors.urls.paths

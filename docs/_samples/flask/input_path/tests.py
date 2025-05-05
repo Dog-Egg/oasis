@@ -1,11 +1,7 @@
-from flask import Flask
-
-from .urls import router
+from .app import app
 
 
 def test_requests():
-    app = Flask(__name__)
-    router.register_with(app)
     with app.test_client() as client:
         response = client.get("/users/1")
         assert response.status_code == 200

@@ -9,7 +9,7 @@ from urllib.parse import quote
 import docutils
 import docutils.nodes
 from docutils.parsers.rst import directives
-from oasis_shared import RouterBase as Router
+from oasis_shared import PathTemplateBase, ResourceBase
 from sphinx.application import Sphinx
 from sphinx.util.docutils import SphinxDirective
 
@@ -26,9 +26,9 @@ class SwaggerUI(SphinxDirective):
     option_spec = {"config": directives.unchanged_required}
 
     def run(self):
-        router = _import_string(self.arguments[0].strip())
+        router_or_paths = _import_string(self.arguments[0].strip())
 
-        config = {"spec": _openapi_template(router)}
+        config = {"spec": _openapi_template(router_or_paths)}
         if "config" in self.options:
             config.update(json.loads(self.options["config"]))
 
@@ -47,12 +47,18 @@ class SwaggerUI(SphinxDirective):
         return [docutils.nodes.raw(text=iframe, format="html")]
 
 
-def _openapi_template(router: Router):
+def _openapi_template(router_or_paths: dict[PathTemplateBase, ResourceBase]):
     openapi = "3.0.3"
+
+    paths = {
+        path.openapi_path: resource.spec(openapi)
+        for path, resource in router_or_paths.items()
+    }
+
     oas = {
         "openapi": openapi,
         "info": {"title": "API Document", "version": "0.1.0"},
-        "paths": router.spec(openapi),
+        "paths": paths,
     }
     validate_openapi30(oas)
     return oas

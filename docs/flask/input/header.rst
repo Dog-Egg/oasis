@@ -1,7 +1,7 @@
 From Header
 ===========
 
-.. literalinclude:: /_samples/flask/input_header/views.py
+.. literalinclude:: /_samples/flask/input_header/app.py
 
-.. swaggerui:: _samples.flask.input_header.urls.router
+.. swaggerui:: _samples.flask.input_header.app.paths
     :config: {"docExpansion": "full"}

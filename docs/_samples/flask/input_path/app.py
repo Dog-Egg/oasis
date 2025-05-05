@@ -1,8 +1,8 @@
 from dataclasses import asdict, dataclass
 
 import zangar as z
-from flask import abort
-from flask_oasis import MediaType, Resource, input, output, responseify
+from flask import Flask, abort
+from flask_oasis import MediaType, PathTemplate, Resource, input, output, responseify
 
 
 @dataclass
@@ -19,7 +19,7 @@ USERS = [
 ]
 
 
-class Users(Resource):
+class UserAPI(Resource):
     @input.path("uid", z.to.int())
     @output.response(
         200,
@@ -36,3 +36,12 @@ class Users(Resource):
                 return responseify(user)
         else:
             abort(404)
+
+
+paths = {
+    PathTemplate("/users/{uid}"): UserAPI,
+}
+
+app = Flask(__name__)
+for path, resource in paths.items():
+    app.add_url_rule(path.flask_path, view_func=resource.as_view())

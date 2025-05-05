@@ -1,12 +1,10 @@
 import yaml
-from flask import Flask
 
+from .app import app
 from .processors import yaml_request_processor, yaml_response_processor
-from .urls import router
 
 
 def test_request():
-    app = Flask(__name__)
     app.config.update(
         {
             "OASIS_REQUEST_CONTENT_PROCESSORS": {
@@ -20,7 +18,6 @@ def test_request():
             },
         }
     )
-    router.register_with(app)
     with app.test_client() as client:
         response = client.post(
             "/myapi",

@@ -1,8 +1,17 @@
 from dataclasses import asdict, dataclass, field
 
 import zangar as z
-from flask import abort
-from flask_oasis import MediaType, Resource, input, output, responseify
+from starlette.applications import Starlette
+from starlette.responses import Response
+from starlette.routing import Route
+from starlette_oasis import (
+    MediaType,
+    PathTemplate,
+    Resource,
+    input,
+    output,
+    responseify,
+)
 
 
 @dataclass
@@ -40,7 +49,7 @@ class UsersAPI(Resource):
             )
         },
     )
-    def get(self, paging: Paging):
+    async def get(self, request, paging: Paging):
         offset = (paging.page - 1) * paging.page_size
         return responseify(
             {
@@ -62,7 +71,7 @@ class UsersAPI(Resource):
             "application/json": MediaType(z.dataclass(User).transform(asdict)),
         },
     )
-    def post(self, data: dict):
+    async def post(self, request, data: dict):
         user = User(id=USERS[-1].id + 1, **data)
         USERS.append(user)
         return responseify(user)
@@ -71,14 +80,14 @@ class UsersAPI(Resource):
 class UserAPI(Resource):
     @input.path("uid", z.to.int(), description="User ID")
     @output.response(404)
-    def dispatch(self, uid):
+    async def dispatch(self, request, uid):
         for user in USERS:
             if user.id == uid:
                 self.user = user
                 break
         else:
-            abort(404)
-        return super().dispatch(uid)
+            return Response(status_code=404)
+        return await super().dispatch(request, uid)
 
     @output.response(
         200,
@@ -86,7 +95,7 @@ class UserAPI(Resource):
             "application/json": MediaType(z.dataclass(User).transform(asdict)),
         },
     )
-    def get(self, uid):
+    async def get(self, request, uid):
         return responseify(self.user)
 
     @input.body(
@@ -103,12 +112,23 @@ class UserAPI(Resource):
             "application/json": MediaType(z.dataclass(User).transform(asdict)),
         },
     )
-    def patch(self, uid, data: dict):
+    async def patch(self, request, uid, data: dict):
         for k, v in data.items():
             setattr(self.user, k, v)
         return responseify(self.user)
 
     @output.response(204)
-    def delete(self, uid):
+    async def delete(self, request, uid):
         USERS.remove(self.user)
-        return "", 204
+        return Response(status_code=204)
+
+
+paths: dict[PathTemplate, type[Resource]] = {
+    PathTemplate("/users"): UsersAPI,
+    PathTemplate("/users/{uid}"): UserAPI,
+}
+
+
+app = Starlette(
+    routes=[Route(path.starlette_path, resource) for path, resource in paths.items()],
+)

@@ -3,5 +3,5 @@ From Body
 
 .. literalinclude:: /_samples/django/input_body/views.py
 
-.. swaggerui:: _samples.django.input_body.urls.router
+.. swaggerui:: _samples.django.input_body.urls.paths
     :config: {"docExpansion": "full"}

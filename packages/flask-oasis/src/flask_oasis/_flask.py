@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from flask import Blueprint, Flask, current_app, jsonify, make_response, request
+from flask import current_app, jsonify, make_response, request
 from oasis_shared import (
     HTTP_METHODS,
     CookieBase,
     HeaderBase,
     ParameterDecoratorBase,
     PathBase,
+    PathTemplateBase,
     QueryBase,
     RequestBodyDecoratorBase,
     ResourceBase,
-    RouterBase,
+    catch_throw,
     responseify_base,
 )
 from werkzeug.datastructures import Headers
@@ -77,6 +78,7 @@ class Resource(ResourceBase):
 
     @classmethod
     def as_view(cls):
+        @catch_throw
         def view(*args, **kwargs):
             return cls().dispatch(*args, **kwargs)
 
@@ -86,24 +88,6 @@ class Resource(ResourceBase):
         view.__name__ = cls.__name__
 
         return view
-
-
-class Router(RouterBase):
-    def register_with(self, scaffold: Blueprint | Flask, /):
-        for item in self._items:
-            view = item.resource.as_view()
-
-            parts = []
-            for part in item.split_path:
-                if isinstance(part, str):
-                    parts.append(part)
-                else:
-                    parts.append(
-                        f"<{part.variable}>"
-                        if part.converter is None
-                        else f"<{part.converter}:{part.variable}>"
-                    )
-            scaffold.add_url_rule("/" + "/".join(parts), view_func=view)
 
 
 def responseify(*args, **kwargs):
@@ -156,3 +140,19 @@ def _process_schema_parsing_exception(e: ValidationError, location: str):
 
 def body(*args, **kwargs):
     return RequestBodyDecorator(*args, **kwargs)
+
+
+class PathTemplate(PathTemplateBase):
+    @property
+    def flask_path(self):
+        parts = []
+        for part in self._parts:
+            if isinstance(part, str):
+                parts.append(part)
+            else:
+                parts.append(
+                    f"<{part.variable}>"
+                    if part.converter is None
+                    else f"<{part.converter}:{part.variable}>"
+                )
+        return "/" + "/".join(parts)

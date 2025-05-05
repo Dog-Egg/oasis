@@ -1,0 +1,8 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "starlette-oasis"
+version = "0.1.dev0"
+dependencies = ["Zangar @ git+https://github.com/Dog-Egg/Zangar"]

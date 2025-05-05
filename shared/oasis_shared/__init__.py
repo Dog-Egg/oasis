@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import abc
+import contextlib
 import functools
 import itertools
 import re
@@ -9,6 +10,7 @@ from collections.abc import Callable, Hashable
 from contextvars import ContextVar
 from dataclasses import dataclass
 from http import HTTPStatus
+from inspect import iscoroutinefunction
 from typing import Any, NamedTuple
 
 import zangar as z
@@ -18,10 +20,6 @@ HTTP_METHODS = ["get", "post", "put", "delete", "patch", "head", "options", "tra
 
 class ResourceBase:
     def dispatch(self, *args, **kwargs):
-        raise NotImplementedError
-
-    @classmethod
-    def as_view(cls):
         raise NotImplementedError
 
     @classmethod
@@ -228,45 +226,29 @@ def _split_path(path: str):
     return parts
 
 
-@dataclass
-class _RouterItem:
-    split_path: list[_DynamicPart | str]
-    resource: type[ResourceBase]
+class PathTemplateBase:
+    def __init__(self, path: str, /) -> None:
+        self._parts = _split_path(path)
+
+    @property
+    def openapi_path(self):
+        parts: list[str] = []
+        for part in self._parts:
+            if isinstance(part, str):
+                parts.append(part)
+            else:
+                parts.append(f"{{{part.variable}}}")
+        return "/" + "/".join(parts)
 
 
-class RouterBase:
-    def __init__(self) -> None:
-        self._items: list[_RouterItem] = []
-
-    def add_url(self, path: str, resource: type[ResourceBase]):
-        self._items.append(
-            _RouterItem(
-                split_path=_split_path(path),
-                resource=resource,
-            )
-        )
-
-    def spec(self, openapi: str):
-        rv = {}
-        for item in self._items:
-            parts: list[str] = []
-            for part in item.split_path:
-                if isinstance(part, str):
-                    parts.append(part)
-                else:
-                    parts.append(f"{{{part.variable}}}")
-            rv["/" + "/".join(parts)] = item.resource.spec(openapi)
-        return rv
-
-
-class ResponseDescription(NamedTuple):
+class ResponseDefinition(NamedTuple):
     status: int
     media_type: str
     media_type_object: MediaType
 
 
-response_descriptions: ContextVar[list[ResponseDescription]] = ContextVar(
-    "response_descriptions"
+response_definitions: ContextVar[list[ResponseDefinition]] = ContextVar(
+    "response_definitions"
 )
 
 
@@ -279,7 +261,7 @@ def responseify_base(
     content_type: str | None = None,
     get_processor: Callable[[str], Callable],
 ):
-    descriptions = response_descriptions.get([])
+    descriptions = response_definitions.get([])
 
     # filter by status and media_type
     if status is not None:
@@ -369,22 +351,37 @@ def response(
 
         local = (
             [
-                ResponseDescription(status, content_type, media_type)
+                ResponseDefinition(status, content_type, media_type)
                 for content_type, media_type in content.items()
             ]
             if content
             else []
         )
 
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            token = response_descriptions.set(local + response_descriptions.get([]))
+        @contextlib.contextmanager
+        def response_definitions_context():
+            token = response_definitions.set(local + response_definitions.get([]))
             try:
-                return func(*args, **kwargs)
+                yield
             finally:
-                response_descriptions.reset(token)
+                response_definitions.reset(token)
 
-        return wrapper
+        if iscoroutinefunction(func):
+
+            @functools.wraps(func)
+            async def awrapper(*args, **kwargs):
+                with response_definitions_context():
+                    return await func(*args, **kwargs)
+
+            return awrapper
+        else:
+
+            @functools.wraps(func)
+            def wrapper(*args, **kwargs):
+                with response_definitions_context():
+                    return func(*args, **kwargs)
+
+            return wrapper
 
     return decorator
 
@@ -407,41 +404,92 @@ class RequestBodyDecoratorBase(abc.ABC):
     def __call__(self, func):
         set_oas_definition(func, self.request_body_object)
 
-        @functools.wraps(func)
-        def wrapper(res, *args, **kwargs):
-            media_type = self.request_media_type(*args, **kwargs)
-            if media_type not in self.request_body_object.content:
-                return self.unsupported_media_type()
+        def get_media_type(*args, **kwargs):
+            meida_type = self.request_media_type(*args, **kwargs)
+            if meida_type not in self.request_body_object.content:
+                throw(self.unsupported_media_type())
+            return meida_type
 
-            data_or_resp = self.get_processor(media_type)(
-                *self.get_processor_args(*args, **kwargs)
-            )
-            if self.is_response(data_or_resp):
-                return data_or_resp
-
+        def parse_data(media_type: str, data):
             try:
-                value = self.request_body_object.content[media_type].parse(data_or_resp)
+                value = self.request_body_object.content[media_type].parse(data)
             except z.ValidationError as e:
-                return self.process_schema_parsing_exception(e)
-            extra = {self.bind_to: value}
-            return func(res, *args, **kwargs, **extra)
+                throw(self.process_schema_parsing_exception(e))
+            return value
 
-        return wrapper
+        if iscoroutinefunction(func):
+
+            @functools.wraps(func)
+            async def awrapper(res, *args, **kwargs):
+                media_type = get_media_type(*args, **kwargs)
+                processor = self.get_processor(media_type)
+                processor_args = self.get_processor_args(*args, **kwargs)
+                data = await processor(*processor_args)
+                value = parse_data(media_type, data)
+                return await func(res, *args, **kwargs, **{self.bind_to: value})
+
+            return awrapper
+        else:
+
+            @functools.wraps(func)
+            def wrapper(res, *args, **kwargs):
+                media_type = get_media_type(*args, **kwargs)
+                processor = self.get_processor(media_type)
+                processor_args = self.get_processor_args(*args, **kwargs)
+                data = processor(*processor_args)
+                if self.is_response(data):
+                    return data
+                value = parse_data(media_type, data)
+                return func(res, *args, **kwargs, **{self.bind_to: value})
+
+            return wrapper
 
     def get_processor_args(self, *args, **kwargs) -> tuple:
         return tuple()
 
     @abc.abstractmethod
-    def request_media_type(self, *args, **kwargs): ...
+    def request_media_type(self, *args, **kwargs) -> str: ...
 
     @abc.abstractmethod
     def unsupported_media_type(self): ...
 
-    @abc.abstractmethod
-    def is_response(self, response): ...
+    def is_response(self, response):
+        raise NotImplementedError
 
     @abc.abstractmethod
-    def get_processor(self, media_type) -> Callable: ...
+    def get_processor(self, media_type: str) -> Callable: ...
 
     @abc.abstractmethod
     def process_schema_parsing_exception(self, e: z.ValidationError): ...
+
+
+class ThrowValue(Exception):
+    def __init__(self, value):
+        self.value = value
+
+
+def throw(value, /):
+    raise ThrowValue(value)
+
+
+def catch_throw(func):
+    if iscoroutinefunction(func):
+
+        @functools.wraps(func)
+        async def awrapper(*args, **kwargs):
+            try:
+                return await func(*args, **kwargs)
+            except ThrowValue as e:
+                return e.value
+
+        return awrapper
+    else:
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except ThrowValue as e:
+                return e.value
+
+        return wrapper
