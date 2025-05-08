@@ -12,7 +12,6 @@ from django_oasis import (
     output,
     responseify,
 )
-from django_oasis.settings import user_settings
 
 
 def test_http_405():
@@ -108,11 +107,6 @@ def test_responseify():
     assert e.value.args == ("No MediaType found",)
 
 
-def test_user_settings():
-    with pytest.raises(AttributeError):
-        user_settings.UNKNOWN
-
-
 def test_swagger_ui():
     from django_oasis.docs import swagger_ui
 
@@ -128,12 +122,3 @@ def test_swagger_ui():
 
     response = view(RequestFactory().get("/", headers={"if-none-match": etag}))
     assert response.status_code == 304
-
-
-@output.response(200, content={"text/plain": MediaType()})
-def test_responseif_content_type():
-    with pytest.warns(DeprecationWarning):
-        responseify(
-            "Hello, World!",
-            content_type="text/plain",
-        )

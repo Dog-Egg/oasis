@@ -1,0 +1,4 @@
+[project]
+name = 'my-sphinx-extensions'
+version = '0.1'
+dependencies = ["jsonschema"]

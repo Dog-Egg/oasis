@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from collections import ChainMap
+import json
 
 import zangar as z
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.http.response import HttpResponseBase
-from django.utils.module_loading import import_string
 from oasis_shared import (
     HTTP_METHODS,
     CookieBase,
@@ -17,10 +16,8 @@ from oasis_shared import (
     RequestBodyDecoratorBase,
     ResourceBase,
     catch_throw,
-    responseify_base,
+    resource_ctx,
 )
-
-from . import settings
 
 
 def _process_schema_parsing_exception(e: z.ValidationError, location: str):
@@ -36,7 +33,37 @@ class ParameterDecorator(ParameterDecoratorBase):
         return _process_schema_parsing_exception(e, self.param.location)
 
 
+def _json_response_processor(kwargs):
+    return JsonResponse(kwargs["data"], status=kwargs["status"])
+
+
+def _json_request_processor(request: HttpRequest):
+    try:
+        return json.loads(request.body)
+    except json.JSONDecodeError:
+        return HttpResponse("Invalid JSON", status=400, content_type="text/plain")
+
+
+def _form_request_processor(request: HttpRequest):
+    return request.POST.dict()
+
+
+def _text_response_processor(kwargs):
+    return HttpResponse(
+        kwargs["data"], status=kwargs["status"], content_type="text/plain"
+    )
+
+
 class Resource(ResourceBase):
+    request_content_processors = {
+        "application/json": _json_request_processor,
+        "application/x-www-form-urlencoded": _form_request_processor,
+    }
+    response_content_processors = {
+        "application/json": _json_response_processor,
+        "text/plain": _text_response_processor,
+    }
+
     def dispatch(self, request, *args, **kwargs):
         method = request.method.lower()
         if method in HTTP_METHODS and hasattr(self, method):
@@ -48,7 +75,8 @@ class Resource(ResourceBase):
         @catch_throw
         def view(*args, **kwargs):
             # 每个请求都会创建一个新的 Resoruce 实例，这意味即使将数据写入 self 也是安全的。
-            return cls().dispatch(*args, **kwargs)
+            with resource_ctx(cls):
+                return cls().dispatch(*args, **kwargs)
 
         return view
 
@@ -97,14 +125,6 @@ class RequestBodyDecorator(RequestBodyDecoratorBase):
     def request_media_type(self, request: HttpRequest, *args, **kwargs):
         return request.content_type
 
-    def get_processor(self, media_type):
-        return import_string(
-            ChainMap(
-                settings.user_settings.OASIS_REQUEST_CONTENT_PROCESSORS,
-                settings.OASIS_REQUEST_CONTENT_PROCESSORS,
-            )[media_type]
-        )
-
     def get_processor_args(self, request, *args, **kwargs) -> tuple:
         return (request,)
 
@@ -120,19 +140,6 @@ class RequestBodyDecorator(RequestBodyDecoratorBase):
 
 def body(*args, **kwargs):
     return RequestBodyDecorator(*args, **kwargs)
-
-
-def responseify(*args, **kwargs):
-    return responseify_base(
-        *args,
-        **kwargs,
-        get_processor=lambda content_type: import_string(
-            ChainMap(
-                settings.user_settings.OASIS_RESPONSE_CONTENT_PROCESSORS,
-                settings.OASIS_RESPONSE_CONTENT_PROCESSORS,
-            )[content_type]
-        ),
-    )
 
 
 class PathTemplate(PathTemplateBase):

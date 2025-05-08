@@ -25,5 +25,5 @@ python >= 3.9
 ### Testing
 
 ```sh
-tox
+nox
 ```

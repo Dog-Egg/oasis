@@ -1,12 +1,6 @@
-[tool.coverage.report]
-exclude_also = ["raise NotImplementedError"]
-
-[tool.coverage.run]
-omit = ["docs/*"]
-
 [tool.pytest.ini_options]
 python_files = ["test_*.py", "tests.py"]
-asyncio_default_fixture_loop_scope = "function"
+addopts = "-p no:asyncio"
 
 [tool.isort]
 profile = "black"

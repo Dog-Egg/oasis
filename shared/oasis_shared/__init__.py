@@ -3,9 +3,9 @@ from __future__ import annotations
 import abc
 import contextlib
 import functools
+import inspect
 import itertools
 import re
-import warnings
 from collections.abc import Callable, Hashable
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -19,6 +19,9 @@ HTTP_METHODS = ["get", "post", "put", "delete", "patch", "head", "options", "tra
 
 
 class ResourceBase:
+    response_content_processors: dict[str, Callable] = {}
+    request_content_processors: dict[str, Callable] = {}
+
     def dispatch(self, *args, **kwargs):
         raise NotImplementedError
 
@@ -66,6 +69,18 @@ class ResourceBase:
                 else:
                     raise NotImplementedError(f"Unknown definition: {definition}")
         return rv
+
+
+_cv_resource: ContextVar[type[ResourceBase]] = ContextVar("current_resource")
+
+
+@contextlib.contextmanager
+def resource_ctx(resource: type[ResourceBase]):
+    token = _cv_resource.set(resource)
+    try:
+        yield
+    finally:
+        _cv_resource.reset(token)
 
 
 def _get_schema_spec(schema, openapi: str):
@@ -258,24 +273,12 @@ def responseify_base(
     *,
     status: int | None = None,
     media_type: str | None = None,
-    content_type: str | None = None,
-    get_processor: Callable[[str], Callable],
 ):
     descriptions = response_definitions.get([])
 
     # filter by status and media_type
     if status is not None:
         descriptions = filter(lambda x: x.status == status, descriptions)
-
-    if content_type is not None:
-        warnings.warn(
-            "content_type is deprecated, use media_type instead",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-    if media_type is None:
-        media_type = content_type
-
     if media_type is not None:
         descriptions = filter(lambda x: x.media_type == media_type, descriptions)
 
@@ -287,12 +290,25 @@ def responseify_base(
         raise RuntimeError(f"No {MediaType.__name__} found")
 
     d = descriptions[0]
-    return get_processor(d.media_type)(
+
+    resource = _cv_resource.get()
+    for res in inspect.getmro(resource):
+        if issubclass(res, ResourceBase):
+            if d.media_type in res.response_content_processors:
+                processor = res.response_content_processors[d.media_type]
+                break
+    else:
+        raise NotImplementedError(d.media_type)
+
+    return processor(
         dict(
             data=d.media_type_object.parse(raw),
             status=d.status,
         )
     )
+
+
+responseify = responseify_base
 
 
 class ParameterDecoratorBase(abc.ABC):
@@ -302,16 +318,30 @@ class ParameterDecoratorBase(abc.ABC):
     def __call__(self, func):
         set_oas_definition(func, self.param)
 
-        @functools.wraps(func)
-        def wrapper(res, *args, **kwargs):
+        def get_args(*args, **kwargs):
             try:
                 extra = self.param.parse_request(*args, **kwargs)
             except z.ValidationError as e:
-                return self.process_schema_parsing_exception(e)
+                throw(self.process_schema_parsing_exception(e))
             args, kwargs = self.param.modify_args(*args, **kwargs)
-            return func(res, *args, **kwargs, **extra)
+            return args, kwargs, extra
 
-        return wrapper
+        if iscoroutinefunction(func):
+
+            @functools.wraps(func)
+            async def awrapper(res, *args, **kwargs):
+                args, kwargs, extra = get_args(*args, **kwargs)
+                return await func(res, *args, **kwargs, **extra)
+
+            return awrapper
+        else:
+
+            @functools.wraps(func)
+            def wrapper(res, *args, **kwargs):
+                args, kwargs, extra = get_args(*args, **kwargs)
+                return func(res, *args, **kwargs, **extra)
+
+            return wrapper
 
     @abc.abstractmethod
     def process_schema_parsing_exception(self, e: z.ValidationError): ...
@@ -456,8 +486,12 @@ class RequestBodyDecoratorBase(abc.ABC):
     def is_response(self, response):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def get_processor(self, media_type: str) -> Callable: ...
+    def get_processor(self, media_type: str):
+        for res in inspect.getmro(_cv_resource.get()):
+            if issubclass(res, ResourceBase):
+                if media_type in res.request_content_processors:
+                    return res.request_content_processors[media_type]
+        raise NotImplementedError(media_type)
 
     @abc.abstractmethod
     def process_schema_parsing_exception(self, e: z.ValidationError): ...

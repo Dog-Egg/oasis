@@ -5,4 +5,8 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "starlette-oasis"
 version = "0.1.dev0"
-dependencies = ["Zangar @ git+https://github.com/Dog-Egg/Zangar"]
+dependencies = ["starlette", "Zangar @ git+https://github.com/Dog-Egg/Zangar"]
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"
+python_files = ["test_*.py", "tests.py"]

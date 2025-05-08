@@ -12,10 +12,9 @@ from oasis_shared import (
     RequestBodyDecoratorBase,
     ResourceBase,
     catch_throw,
-    responseify_base,
+    resource_ctx,
 )
 from werkzeug.datastructures import Headers
-from werkzeug.utils import import_string
 from zangar.exceptions import ValidationError
 
 
@@ -72,7 +71,34 @@ def header(*args, **kwargs):
     return ParameterDecorator(Header(*args, **kwargs))
 
 
+def _json_response_processor(kwargs):
+    return make_response(jsonify(kwargs["data"]), kwargs["status"])
+
+
+def _json_request_processor():
+    return request.json
+
+
+def _form_request_processor():
+    return request.form
+
+
+def _text_response_processor(kwargs):
+    response = make_response(kwargs["data"], kwargs["status"])
+    response.mimetype = "text/plain"
+    return response
+
+
 class Resource(ResourceBase):
+    request_content_processors = {
+        "application/json": _json_request_processor,
+        "application/x-www-form-urlencoded": _form_request_processor,
+    }
+    response_content_processors = {
+        "application/json": _json_response_processor,
+        "text/plain": _text_response_processor,
+    }
+
     def dispatch(self, *args, **kwargs):
         return getattr(self, request.method.lower())(*args, **kwargs)
 
@@ -80,7 +106,8 @@ class Resource(ResourceBase):
     def as_view(cls):
         @catch_throw
         def view(*args, **kwargs):
-            return cls().dispatch(*args, **kwargs)
+            with resource_ctx(cls):
+                return cls().dispatch(*args, **kwargs)
 
         view.methods = [
             method.upper() for method in HTTP_METHODS if hasattr(cls, method)
@@ -90,39 +117,9 @@ class Resource(ResourceBase):
         return view
 
 
-def responseify(*args, **kwargs):
-    from . import processors
-
-    default_processors = {
-        "application/json": processors.json_response_processor,
-        "text/plain": processors.text_response_processor,
-    }
-
-    def get_processor(media_type):
-        processors = current_app.config.get("OASIS_RESPONSE_CONTENT_PROCESSORS", {})
-        if media_type in processors:
-            return import_string(processors[media_type])
-        return default_processors[media_type]
-
-    return responseify_base(*args, **kwargs, get_processor=get_processor)
-
-
 class RequestBodyDecorator(RequestBodyDecoratorBase):
     def request_media_type(self, *args, **kwargs):
         return request.content_type
-
-    def get_processor(self, media_type):
-        from . import processors
-
-        default_processors = {
-            "application/json": processors.json_request_processor,
-            "application/x-www-form-urlencoded": processors.form_request_processor,
-        }
-
-        processors = current_app.config.get("OASIS_REQUEST_CONTENT_PROCESSORS", {})
-        if media_type in processors:
-            return import_string(processors[media_type])
-        return default_processors[media_type]
 
     def is_response(self, response):
         return isinstance(response, current_app.response_class)
