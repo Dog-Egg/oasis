@@ -10,7 +10,7 @@ settings_module = types.ModuleType("settings")
 with open(os.path.join(os.path.dirname(__file__), "settings.py")) as f:
     code = f.read()
     code = code.replace(
-        "<your-processors-module>", "_samples.django.customize_processors.processors"
+        "<your-processors-module>", "_samples.customize_processors.processors"
     )
 exec(code, settings_module.__dict__)
 

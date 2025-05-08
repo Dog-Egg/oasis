@@ -5,4 +5,4 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "flask-oasis"
 version = "0.1.dev0"
-dependencies = ["Zangar @ git+https://github.com/Dog-Egg/Zangar"]
+dependencies = ["flask", "Zangar @ git+https://github.com/Dog-Egg/Zangar"]

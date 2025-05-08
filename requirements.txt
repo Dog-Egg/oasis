@@ -1,4 +1,0 @@
--r requirements/doc.txt
-
--e packages/flask-oasis
--e packages/django-oasis

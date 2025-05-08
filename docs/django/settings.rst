@@ -1,6 +1,0 @@
-Settings
-========
-
-.. setting:: OASIS_REQUEST_CONTENT_PROCESSORS
-
-.. setting:: OASIS_RESPONSE_CONTENT_PROCESSORS
